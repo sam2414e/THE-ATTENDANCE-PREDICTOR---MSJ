@@ -18,6 +18,7 @@ function dateValue(offset = 0) {
 }
 
 export function roomAvailability(room, date, startTime, endTime) {
+  if (!date || !startTime || !endTime) return { status: 'unknown', available: false, conflicts: [], reason: 'Add a date and time window to check availability.' }
   const requestedStart = timeToMinutes(startTime)
   const requestedEnd = timeToMinutes(endTime)
   const conflicts = roomTimetable.filter((entry) => {
@@ -26,7 +27,10 @@ export function roomAvailability(room, date, startTime, endTime) {
     return entry.roomId === room.id && entry.date === date && requestedStart !== null && requestedEnd !== null && entryStart < requestedEnd && entryEnd > requestedStart
   })
   if (!roomTimetable.length) return { status: 'unknown', available: false, conflicts: [], reason: 'Availability data unavailable.' }
-  if (conflicts.length) return { status: 'occupied', available: false, conflicts, reason: 'A timetable or booking conflict exists.' }
+  if (conflicts.length) {
+    const reserved = conflicts.some((entry) => entry.status === 'reserved')
+    return { status: reserved ? 'reserved' : 'occupied', available: false, conflicts, reason: `${conflicts[0].subject || 'A timetable event'} overlaps the requested window.` }
+  }
   return { status: 'available', available: true, conflicts: [], reason: 'No conflict found in the configured timetable.' }
 }
 
