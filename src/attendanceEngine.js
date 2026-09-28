@@ -38,6 +38,13 @@ export function calculateGoalPlan(row, goal) {
   }
 }
 
+export function parseAttendanceHistory(value) {
+  return value.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
+    const [date, subject, type, percentage] = line.split(',').map((item) => item.trim())
+    return { date, subject, type: type || 'event', percentage: percentage ? Number(percentage) : null }
+  }).filter((event) => /^\d{4}-\d{2}-\d{2}$/.test(event.date) && event.subject && ['attended', 'absence', 'leave', 'OD', 'medical', 'event'].includes(event.type))
+}
+
 export function calculateUpcomingClasses(section, subjectCode, fromDate, semesterEnd, holidays = new Set(), cancellations = new Set(), limit = 5) {
   const [year, month, day] = fromDate.split('-').map(Number)
   const [endYear, endMonth, endDay] = semesterEnd.split('-').map(Number)
