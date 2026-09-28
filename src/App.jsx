@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import './App.css'
+import AttendanceAdvisor from './AttendanceAdvisor'
 import {
   calculateCurrentAttendance,
   calculateMaximumMisses,
@@ -93,6 +94,7 @@ function App() {
       {dangerCount > 0 && <section className="detention-alert"><div className="alert-icon">!</div><div><p className="eyebrow">Irreversible detention</p><h3>{dangerCount} subject{dangerCount === 1 ? '' : 's'} cannot reach 75%</h3><p>Even with perfect attendance in every remaining scheduled class, the maximum possible final attendance is below the mandatory threshold. This warning is based on the final projection, not current attendance alone.</p><div className="alert-subjects">{rows.filter((row) => row.status.key === 'irreversible').map((row) => <span key={row.code}><strong>{row.name}</strong> · {row.current.toFixed(1)}% now → {row.maximum.toFixed(1)}% max · {row.dangerRequired} required / {row.remaining} available</span>)}</div></div></section>}
       {recoveryRows.length > 0 && <section className="planner-grid"><article className="recovery-card"><p className="eyebrow">Recovery planner</p><h3>Bring a recoverable subject back above 75%.</h3>{recoveryRows.slice(0, 3).map((row) => <div className="planner-item" key={row.code}><strong>{row.name}</strong><span>Current {row.current.toFixed(1)}% · attend next {row.dangerRequired} classes · {row.misses75} safe miss{row.misses75 === 1 ? '' : 'es'}</span></div>)}</article><article className="target-planner"><p className="eyebrow">90% target planner</p><h3>Keep the target ambitious and exact.</h3>{rows.filter((row) => row.conducted).slice(0, 3).map((row) => <div className="planner-item" key={row.code}><strong>{row.name}</strong><span>{row.targetRequired > row.remaining ? `Not achievable: ${row.targetRequired} required / ${row.remaining} available` : `${row.targetRequired} required · ${row.misses90} classes can be missed`}</span></div>)}</article></section>}
       <footer><span>Semester window · {formatDate(SEMESTER_START)} — {formatDate(SEMESTER_END)}</span><span><i className="dot green" /> Timetable-aware calculations</span></footer>
+      <AttendanceAdvisor context={{ rows, section, sectionCode, today, planningDate, holidays, cancellations, leavePolicy: null }} />
     </main>
   )
 }
