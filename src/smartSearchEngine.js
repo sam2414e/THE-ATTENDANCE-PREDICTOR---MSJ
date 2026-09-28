@@ -36,14 +36,13 @@ function roomWindow(room, now) {
 
 export function getRoomStatus(room, now, claims = {}) {
   const claim = claims[room.id]
-  const events = roomWindow(room, now)
-  const active = events.find((event) => event.startAt <= now && event.endAt > now)
+  if (claim && claim.until > now) return { key: 'claimed', label: 'Claimed', icon: '🔵', detail: `Claimed by ${claim.name} until ${new Date(claim.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, countdownSeconds: (claim.until - now) / 1000, active: null }
+  const active = roomWindow(room, now).find((event) => event.startAt <= now && event.endAt > now)
   if (active) {
     const seconds = (active.endAt - now) / 1000
     return { key: seconds <= 15 * 60 ? 'ending' : 'occupied', label: seconds <= 15 * 60 ? 'Ending soon' : 'Occupied', icon: seconds <= 15 * 60 ? '🟡' : '🔴', detail: `${active.subject} ends at ${new Date(active.endAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, countdownSeconds: seconds, active }
   }
-  const next = events.find((event) => event.startAt > now)
-  if (claim && claim.until > now) return { key: 'claimed', label: 'Claimed', icon: '🔵', detail: `Claimed by ${claim.name} until ${new Date(claim.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, countdownSeconds: (claim.until - now) / 1000, active: null, next }
+  const next = roomWindow(room, now).find((event) => event.startAt > now)
   return { key: 'free', label: 'Free', icon: '🟢', detail: next ? `Next class: ${next.subject}` : 'No upcoming class in the demo schedule', countdownSeconds: next ? (next.startAt - now) / 1000 : null, next }
 }
 
