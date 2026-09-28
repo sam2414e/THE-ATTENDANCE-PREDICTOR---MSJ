@@ -19,6 +19,17 @@ function dateValue(offset = 0) {
   return date.toISOString().slice(0, 10)
 }
 
+function localDateValue(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function clockValue(date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
 function eventAtDate(date, event) {
   const [hour, minute] = event.start.split(':').map(Number)
   const [endHour, endMinute] = event.end.split(':').map(Number)
@@ -105,7 +116,7 @@ export function parseRoomQuery(query) {
   const durationMatch = normalized.match(/(\d+)\s*(?:hour|hours|hr)/)
   const rangeMatch = normalized.match(/(?:from|between)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+(?:to|and|-)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/)
   const timeMatch = normalized.match(/(?:after|at|from)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
-  const roomType = normalized.includes('computer lab') ? 'Computer Lab' : normalized.includes('lecture hall') ? 'Lecture Hall' : normalized.includes('seminar') ? 'Seminar Hall' : normalized.includes('library') ? 'Library' : normalized.includes('reading room') ? 'Reading Room' : normalized.includes('study') ? 'Study Area' : normalized.includes('washroom') || normalized.includes('toilet') ? 'Washroom' : normalized.includes('stair') ? 'Stairwell' : normalized.includes('lift') ? 'Lift Lobby' : normalized.includes('ncc') ? 'NCC Room' : normalized.includes('classroom') ? 'Classroom' : 'all'
+  const roomType = normalized.includes('computer lab') ? 'Computer Lab' : normalized.includes('lecture hall') ? 'Lecture Hall' : normalized.includes('seminar room') ? 'Seminar Room' : normalized.includes('seminar hall') ? 'Seminar Hall' : normalized.includes('library') ? 'Library' : normalized.includes('reading room') ? 'Reading Room' : normalized.includes('study') ? 'Study Area' : normalized.includes('washroom') || normalized.includes('toilet') ? 'Washroom' : normalized.includes('stair') ? 'Stairwell' : normalized.includes('lift') ? 'Lift Lobby' : normalized.includes('ncc') ? 'NCC Room' : normalized.includes('classroom') ? 'Classroom' : 'all'
   const startTime = rangeMatch ? rangeMatch[1] : timeMatch ? timeMatch[0].replace(/^(after|at|from)\s+/, '') : null
   const endTime = rangeMatch ? rangeMatch[2] : durationMatch && startTime ? `${(timeToMinutes(startTime) / 60 + Number(durationMatch[1])).toFixed(0)}:00` : null
   const date = normalized.includes('tomorrow') ? dateValue(1) : normalized.includes('today') ? dateValue() : null
@@ -114,5 +125,17 @@ export function parseRoomQuery(query) {
 
 export function findRoomMatches(requirements) {
   const candidates = filterRooms({ floor: requirements.floor, type: requirements.roomType, capacity: requirements.capacity || '' , facilities: requirements.requiredFacilities })
-  return candidates.map((room) => ({ room, availability: roomAvailability(room, requirements.date || '', requirements.startTime || '', requirements.endTime || '') }))
+  if (!requirements.startTime && !requirements.durationHours && !requirements.date) {
+    return candidates.map((room) => ({ room, availability: roomAvailability(room, '', '', '') }))
+  }
+  const requestedDate = requirements.date || localDateValue()
+  let startTime = requirements.startTime || ''
+  let endTime = requirements.endTime || ''
+  if (!startTime && requirements.durationHours) {
+    const start = new Date()
+    const end = new Date(start.getTime() + requirements.durationHours * 60 * 60 * 1000)
+    startTime = clockValue(start)
+    endTime = clockValue(end)
+  }
+  return candidates.map((room) => ({ room, availability: roomAvailability(room, requestedDate, startTime, endTime) }))
 }
