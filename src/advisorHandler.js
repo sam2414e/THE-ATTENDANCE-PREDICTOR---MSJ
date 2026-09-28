@@ -1,3 +1,5 @@
+import { simulateLeave } from './attendanceEngine'
+
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 function formatPercent(value) {
@@ -25,27 +27,10 @@ function nextWeekday(fromDate, dayName) {
 
 function findLeaveDays(query, today) {
   const dayMatch = query.match(/(\d+)\s*[- ]?day/)
-  const days = dayMatch ? Number(dayMatch[1]) : null
+  const days = dayMatch ? Number(dayMatch[1]) : query.includes('off') && weekdayMatch ? 1 : null
   const weekdayMatch = query.match(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i)
   const start = query.includes('tomorrow') ? new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1) : weekdayMatch ? nextWeekday(today, weekdayMatch[1].replace(/^./, (letter) => letter.toUpperCase())) : null
   return { days, start, weekdayMatch: weekdayMatch?.[1] }
-}
-
-function classesDuringLeave(section, rows, start, days) {
-  if (!start || !days) return []
-  const affected = []
-  for (let index = 0; index < days; index += 1) {
-    const cursor = new Date(start)
-    cursor.setDate(cursor.getDate() + index)
-    const dayName = DAY_NAMES[cursor.getDay()].slice(0, 3)
-    const slots = section.slots[dayName]?.split(',') || []
-    slots.forEach((slot) => {
-      rows.filter((row) => slot === row.code || slot.split('/').includes(row.code)).forEach((row) => {
-        affected.push({ row, date: dateKey(cursor) })
-      })
-    })
-  }
-  return affected
 }
 
 export function answerQuestion(query, context) {
@@ -67,11 +52,11 @@ export function answerQuestion(query, context) {
     const leaveType = /medical|sick/.test(normalizedQuery) ? 'Medical leave' : /\bod\b|official duty/.test(normalizedQuery) ? 'OD leave' : 'Leave'
     const leave = findLeaveDays(contextualQuery, today)
     if (!leave.start || !leave.days) return { tone: 'yellow', text: `${leaveType} simulation needs a clear start date and duration. Try “3-day sick leave starting tomorrow”. The timetable is ready, but I will not guess missing leave details.` }
-    if (!context.leavePolicy) {
-      const affected = classesDuringLeave(section, rows, leave.start, leave.days)
-      const affectedNames = [...new Set(affected.map((item) => item.row.name))]
-      return { tone: 'yellow', text: `${leaveType} from ${dateKey(leave.start)} for ${leave.days} days would touch ${affected.length} scheduled class${affected.length === 1 ? '' : 'es'}${affectedNames.length ? ` (${affectedNames.join(', ')})` : ''}. No OD/Medical leave policy is configured in this dashboard, so I cannot accurately recalculate attendance or claim those classes are excused.` }
-    }
+    const leaveResults = simulateLeave({ rows, section, startDate: dateKey(leave.start), calendarDays: leave.days, leaveType: leaveType === 'Medical leave' ? 'Medical Leave' : 'OD', appliesTo: 'all', subjectCode: subject?.code, excused: false, holidays: context.holidays, cancellations: context.cancellations, semesterEnd: context.semesterEnd })
+    if (!leaveResults.length) return { tone: 'yellow', text: `${leaveType} from ${dateKey(leave.start)} for ${leave.days} days affects no entered subjects with scheduled classes. Enter subject counts to calculate an exact percentage change.` }
+    const affected = leaveResults.reduce((sum, result) => sum + result.affected, 0)
+    const impacted = leaveResults.map((result) => `${result.name}: ${formatPercent(result.current)} → ${formatPercent(result.projected)}`).join('; ')
+    return { tone: leaveResults.some((result) => result.maximum < 75) ? 'red' : 'blue', text: `${leaveType} from ${dateKey(leave.start)} for ${leave.days} days affects ${affected} scheduled period${affected === 1 ? '' : 's'}. ${impacted}. ${leaveResults.some((result) => result.maximum < 75) ? 'IRREVERSIBLE DETENTION: perfect attendance after leave cannot recover a subject to 75%.' : 'Recovery remains mathematically possible for the affected subjects.'}` }
   }
 
   if (/detention|risk|danger|irreversible/.test(normalizedQuery)) {

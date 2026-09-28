@@ -63,9 +63,55 @@ export function calculateUpcomingClasses(section, subjectCode, fromDate, semeste
   return results
 }
 
+export function getScheduledPeriodsInRange(section, subjectCode, startDate, calendarDays, holidays = new Set(), cancellations = new Set(), semesterEnd) {
+  const [year, month, day] = startDate.split('-').map(Number)
+  const cursor = new Date(year, month - 1, day)
+  const end = new Date(cursor)
+  end.setDate(end.getDate() + Math.max(0, Number(calendarDays || 0) - 1))
+  const semesterLimit = semesterEnd ? (() => { const [endYear, endMonth, endDay] = semesterEnd.split('-').map(Number); return new Date(endYear, endMonth - 1, endDay) })() : null
+  const dayNames = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri' }
+  const periods = []
+  for (; cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    if (semesterLimit && cursor > semesterLimit) continue
+    const weekday = dayNames[cursor.getDay()]
+    if (!weekday) continue
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
+    if (holidays.has(key)) continue
+    const slots = section.slots[weekday]?.split(',') || []
+    const count = slots.filter((slot) => slot === subjectCode || slot.split('/').includes(subjectCode)).length
+    if (count && !cancellations.has(`${key}:${subjectCode}`)) periods.push({ date: key, weekday, count })
+  }
+  return periods
+}
+
+export function simulateLeave({ rows, section, startDate, calendarDays, leaveType, appliesTo, subjectCode, excused, holidays, cancellations, semesterEnd }) {
+  const affectedRows = rows.filter((row) => appliesTo === 'all' || row.code === subjectCode)
+  return affectedRows.filter((row) => row.conducted > 0).map((row) => {
+    const periods = getScheduledPeriodsInRange(section, row.code, startDate, calendarDays, holidays, cancellations, semesterEnd)
+    const affected = periods.reduce((sum, period) => sum + period.count, 0)
+    const treatedAttended = leaveType === 'OD' ? affected : 0
+    const treatedAbsent = leaveType === 'Medical Leave' && !excused ? affected : 0
+    const excluded = leaveType === 'Medical Leave' && excused ? affected : 0
+    const projectedConducted = row.conducted + affected - excluded
+    const projectedAttended = row.attended + treatedAttended
+    const remainingAfter = Math.max(0, row.remaining - affected)
+    const projected = calculateCurrentAttendance(projectedAttended, projectedConducted)
+    const required75 = calculateRequiredFor75(projectedAttended, projectedConducted, remainingAfter)
+    const required90 = calculateRequiredFor90(projectedAttended, projectedConducted, remainingAfter)
+    const maximum = calculateMaximumPossibleAttendance(projectedAttended, projectedConducted, remainingAfter)
+    return { ...row, affected, periods, treatedAttended, treatedAbsent, excluded, projected, required75, required90, maximum, remainingAfter, recoveryPossible: maximum !== null && maximum >= DANGER_THRESHOLD }
+  })
+}
+
 export function calculateOverallAttendance(rows) {
   const conducted = rows.reduce((sum, row) => sum + row.conducted, 0)
   const attended = rows.reduce((sum, row) => sum + row.attended, 0)
+  return { conducted, attended, percentage: conducted > 0 ? (attended / conducted) * 100 : null }
+}
+
+export function calculateProjectedOverallAttendance(rows) {
+  const conducted = rows.reduce((sum, row) => sum + row.conducted + row.remaining, 0)
+  const attended = rows.reduce((sum, row) => sum + row.attended + row.remaining, 0)
   return { conducted, attended, percentage: conducted > 0 ? (attended / conducted) * 100 : null }
 }
 
