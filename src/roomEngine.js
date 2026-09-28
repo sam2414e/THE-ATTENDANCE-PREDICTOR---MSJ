@@ -123,10 +123,14 @@ export function parseRoomQuery(query) {
   return { floor, roomType, requiredFacilities: [...new Set(requiredFacilities)], capacity: peopleMatch ? Number(peopleMatch[1]) : null, durationHours: durationMatch ? Number(durationMatch[1]) : null, date, startTime, endTime, requestedTime: rangeMatch ? rangeMatch[0] : timeMatch ? timeMatch[0] : null }
 }
 
-export function findRoomMatches(requirements) {
+export function findRoomMatches(requirements, claims = {}) {
   const candidates = filterRooms({ floor: requirements.floor, type: requirements.roomType, capacity: requirements.capacity || '' , facilities: requirements.requiredFacilities })
   if (!requirements.startTime && !requirements.durationHours && !requirements.date) {
-    return candidates.map((room) => ({ room, availability: roomAvailability(room, '', '', '') }))
+    return candidates.map((room) => {
+      const availability = roomAvailability(room, '', '', '')
+      const claim = claims[room.id]
+      return claim?.until > Date.now() ? { room, availability: { ...availability, status: 'reserved', available: false, reason: 'This room is currently claimed.' } } : { room, availability }
+    })
   }
   const requestedDate = requirements.date || localDateValue()
   let startTime = requirements.startTime || ''
@@ -137,5 +141,14 @@ export function findRoomMatches(requirements) {
     startTime = clockValue(start)
     endTime = clockValue(end)
   }
-  return candidates.map((room) => ({ room, availability: roomAvailability(room, requestedDate, startTime, endTime) }))
+  return candidates.map((room) => {
+    const availability = roomAvailability(room, requestedDate, startTime, endTime)
+    const claim = claims[room.id]
+    const requestStart = new Date(`${requestedDate}T${startTime || '00:00'}:00`)
+    const requestEnd = new Date(`${requestedDate}T${endTime || '23:59'}:00`)
+    if (claim?.until > Date.now() && requestStart.getTime() < claim.until && requestEnd.getTime() > Date.now()) {
+      return { room, availability: { ...availability, status: 'reserved', available: false, reason: 'This room is currently claimed.' } }
+    }
+    return { room, availability }
+  })
 }

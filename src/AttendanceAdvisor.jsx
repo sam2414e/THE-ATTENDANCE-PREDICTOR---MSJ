@@ -11,14 +11,17 @@ const QUICK_PROMPTS = [
 export default function AttendanceAdvisor({ messages, typing, sendMessage }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
-  const endRef = useRef(null)
+  const messagesRef = useRef(null)
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, typing])
+  useEffect(() => {
+    const panel = messagesRef.current
+    if (panel) panel.scrollTo({ top: panel.scrollHeight, behavior: 'smooth' })
+  }, [messages, typing])
 
   function submitMessage(value = draft) { setDraft(''); sendMessage(value) }
 
   return <>
-    {open && <section className="chat-window" aria-label="Attendance Advisor chat"><header className="chat-header"><div><span className="chat-avatar">🤖</span><div><strong>Attendance Advisor</strong><small>Live dashboard connected</small></div></div><button type="button" aria-label="Close Attendance Advisor" onClick={() => setOpen(false)}>×</button></header><div className="chat-messages">{messages.map((message, index) => <div className={`chat-message ${message.from} ${message.tone || ''}`} key={`${message.from}-${index}`}>{message.text}</div>)}{typing && <div className="chat-message bot typing"><i /><i /><i /></div>}<div ref={endRef} /></div><div className="quick-prompts">{QUICK_PROMPTS.map((prompt) => <button type="button" key={prompt} onClick={() => submitMessage(prompt)}>{prompt}</button>)}</div><form className="chat-input" onSubmit={(event) => { event.preventDefault(); submitMessage() }}><input aria-label="Message Attendance Advisor" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask about your attendance..." /><button type="submit" aria-label="Send message">↗</button></form></section>}
+    {open && <section className="chat-window" aria-label="Attendance Advisor chat"><header className="chat-header"><div><span className="chat-avatar">🤖</span><div><strong>Attendance Advisor</strong><small>Live dashboard connected</small></div></div><button type="button" aria-label="Close Attendance Advisor" onClick={() => setOpen(false)}>×</button></header><div className="chat-messages" ref={messagesRef}>{messages.map((message, index) => <div className={`chat-message ${message.from} ${message.tone || ''}`} key={`${message.from}-${index}`}>{message.text}</div>)}{typing && <div className="chat-message bot typing"><i /><i /><i /></div>}</div><div className="quick-prompts">{QUICK_PROMPTS.map((prompt) => <button type="button" key={prompt} onClick={() => submitMessage(prompt)}>{prompt}</button>)}</div><form className="chat-input" onSubmit={(event) => { event.preventDefault(); submitMessage() }}><input aria-label="Message Attendance Advisor" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask about your attendance..." /><button type="submit" aria-label="Send message">↗</button></form></section>}
     <button type="button" className={`chat-launcher ${open ? 'open' : ''}`} onClick={() => setOpen(!open)}><span>🤖</span> Attendance Advisor</button>
   </>
 }
