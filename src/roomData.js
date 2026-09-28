@@ -49,14 +49,14 @@ const generatedFloorLayouts = {
 }
 
 const facilitiesByType = {
-  Classroom: ['Projector', 'Wi-Fi'],
-  'Seminar Hall': ['Projector', 'Smart Board', 'Wi-Fi'],
+  Classroom: ['AC', 'Projector', 'Wi-Fi'],
+  'Seminar Hall': ['AC', 'Projector', 'Smart Board', 'Wi-Fi'],
   Washroom: ['Accessible'],
   Stairwell: ['Emergency Exit'],
   'Lift Lobby': ['Lift Access'],
   'NCC Room': ['Wi-Fi'],
-  'Lecture Hall': ['Projector', 'Smart Board', 'Wi-Fi'],
-  'Seminar Room': ['Projector', 'Wi-Fi'],
+  'Lecture Hall': ['AC', 'Projector', 'Smart Board', 'Wi-Fi'],
+  'Seminar Room': ['AC', 'Projector', 'Wi-Fi'],
   'Library': ['Wi-Fi', 'Study Desks'],
   'Reading Room': ['Wi-Fi', 'Study Desks'],
   'Study Area': ['Wi-Fi', 'Study Desks'],
@@ -65,6 +65,15 @@ const facilitiesByType = {
 }
 
 const layoutForFloor = (floor) => floor.id === 'ground' ? blueprintLayout : generatedFloorLayouts[floor.id]
+
+const timetableTemplates = [
+  [{ start: '08:30', end: '09:30', subject: 'Digital Systems' }, { start: '13:30', end: '14:30', subject: 'Computer Networks' }, { start: '17:00', end: '18:00', subject: 'Project Studio' }],
+  [{ start: '09:00', end: '10:00', subject: 'Database Systems' }, { start: '14:30', end: '15:30', subject: 'Signals & Systems' }, { start: '18:00', end: '19:00', subject: 'Study Group' }],
+  [{ start: '10:00', end: '11:00', subject: 'Machine Learning' }, { start: '15:30', end: '16:30', subject: 'Embedded Systems' }, { start: '19:00', end: '20:00', subject: 'Department Seminar' }],
+  [{ start: '11:30', end: '12:30', subject: 'Wireless Communication' }, { start: '16:30', end: '17:30', subject: 'Open Lab' }, { start: '20:00', end: '21:00', subject: 'Revision Hour' }],
+]
+
+const timetableFor = (type, index) => ['Washroom', 'Stairwell', 'Lift Lobby'].includes(type) ? [] : timetableTemplates[index % timetableTemplates.length]
 
 export const rooms = floors.flatMap((floor) => layoutForFloor(floor).map(([roomNumber, type, x, y, width, height], index) => ({
   id: `room-${floor.id}-${roomNumber.toLowerCase().replaceAll(' ', '-')}`,
@@ -78,6 +87,7 @@ export const rooms = floors.flatMap((floor) => layoutForFloor(floor).map(([roomN
   width,
   height,
   order: index,
+  timetable: timetableFor(type, index),
 })))
 
 export const roomTimetable = []

@@ -1,5 +1,7 @@
 import { rooms, roomTimetable } from './roomData'
 
+export const ENDING_SOON_MINUTES = 5
+
 function timeToMinutes(value) {
   if (!value) return null
   const match = String(value).toLowerCase().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
@@ -17,16 +19,70 @@ function dateValue(offset = 0) {
   return date.toISOString().slice(0, 10)
 }
 
+function eventAtDate(date, event) {
+  const [hour, minute] = event.start.split(':').map(Number)
+  const [endHour, endMinute] = event.end.split(':').map(Number)
+  const startAt = new Date(date)
+  startAt.setHours(hour, minute, 0, 0)
+  const endAt = new Date(date)
+  endAt.setHours(endHour, endMinute, 0, 0)
+  return { ...event, startAt, endAt }
+}
+
+function eventsForDate(room, date) {
+  return (room.timetable || []).map((event) => eventAtDate(date, event)).sort((a, b) => a.startAt - b.startAt)
+}
+
+export function formatClock(value) {
+  return new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+export function formatDuration(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(totalSeconds || 0))
+  return `${Math.floor(seconds / 60)} min ${String(seconds % 60).padStart(2, '0')} sec`
+}
+
+export function getRoomStatus(room, now = new Date(), claims = {}) {
+  const todayEvents = eventsForDate(room, now)
+  const active = todayEvents.find((event) => event.startAt <= now && event.endAt > now)
+  const nextToday = todayEvents.find((event) => event.startAt > now)
+  let next = nextToday
+  if (!next) {
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    next = eventsForDate(room, tomorrow)[0]
+  }
+
+  if (active) {
+    const countdownSeconds = (active.endAt - now) / 1000
+    const ending = countdownSeconds <= ENDING_SOON_MINUTES * 60
+    return { key: ending ? 'ending' : 'occupied', label: ending ? 'Ending soon' : 'Occupied', icon: ending ? '🟡' : '🔴', detail: `${active.subject} ends at ${formatClock(active.endAt)}`, countdownSeconds, active, next }
+  }
+
+  const claim = claims[room.id]
+  if (claim && claim.until > now.getTime()) return { key: 'claimed', label: 'Claimed', icon: '🔵', detail: `Claimed by ${claim.name} until ${formatClock(claim.until)}`, countdownSeconds: (claim.until - now.getTime()) / 1000, active: null, next }
+
+  const countdownSeconds = next ? (next.startAt - now) / 1000 : null
+  const ending = countdownSeconds !== null && countdownSeconds <= ENDING_SOON_MINUTES * 60
+  return { key: ending ? 'ending' : 'free', label: ending ? 'Ending soon' : 'Free', icon: ending ? '🟡' : '🟢', detail: next ? `Next class: ${next.subject}` : 'No upcoming class in the demo schedule', countdownSeconds, active: null, next }
+}
+
 export function roomAvailability(room, date, startTime, endTime) {
   const requestedStart = timeToMinutes(startTime)
   const requestedEnd = timeToMinutes(endTime)
+  if (!date && requestedStart === null && requestedEnd === null) {
+    const status = getRoomStatus(room)
+    return { status: status.key === 'free' || status.key === 'ending' ? 'available' : status.key === 'claimed' ? 'reserved' : 'occupied', available: status.key === 'free' || status.key === 'ending', conflicts: [], reason: status.detail }
+  }
+  const requestedDate = date ? new Date(`${date}T00:00:00`) : new Date()
+  const timetableConflicts = eventsForDate(room, requestedDate).filter((entry) => requestedStart !== null && requestedEnd !== null && timeToMinutes(entry.start) < requestedEnd && timeToMinutes(entry.end) > requestedStart)
   const conflicts = roomTimetable.filter((entry) => {
     const entryStart = timeToMinutes(entry.startTime)
     const entryEnd = timeToMinutes(entry.endTime)
     return entry.roomId === room.id && entry.date === date && requestedStart !== null && requestedEnd !== null && entryStart < requestedEnd && entryEnd > requestedStart
   })
-  if (!roomTimetable.length) return { status: 'unknown', available: false, conflicts: [], reason: 'Availability data unavailable.' }
-  if (conflicts.length) return { status: 'occupied', available: false, conflicts, reason: 'A timetable or booking conflict exists.' }
+  const allConflicts = [...timetableConflicts, ...conflicts]
+  if (allConflicts.length) return { status: 'occupied', available: false, conflicts: allConflicts, reason: 'A timetable or booking conflict exists.' }
   return { status: 'available', available: true, conflicts: [], reason: 'No conflict found in the configured timetable.' }
 }
 
