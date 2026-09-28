@@ -41,7 +41,7 @@ const localDate = (value) => { const [year, month, day] = value.split('-').map(N
 const formatDate = (value) => localDate(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 const todayValue = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` }
 
-function App() {
+export function AttendanceTracker() {
   const today = todayValue()
   const [sectionCode, setSectionCode] = useState('IV-ECE-A')
   const [planningDate, setPlanningDate] = useState(today < SEMESTER_START ? SEMESTER_START : today > SEMESTER_END ? SEMESTER_END : today)
@@ -144,4 +144,3 @@ function App() {
   )
 }
 
-export default App
