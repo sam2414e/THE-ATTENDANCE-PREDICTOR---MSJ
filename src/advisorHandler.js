@@ -85,13 +85,21 @@ export function answerQuestion(query, context) {
     return { tone: 'green', text: `If you attend every remaining scheduled class from ${planningDate}, the maximum final attendance is ${lines}. These projections come directly from the selected section timetable.` }
   }
 
+  if (/recovery|how many classes can i miss|safe miss/.test(normalizedQuery)) {
+    if (!enteredRows.length) return { tone: 'yellow', text: 'Enter conducted and attended counts for at least one subject. Then I can calculate the exact recovery plan and safe misses.' }
+    const plans = enteredRows.map((row) => row.current < 75
+      ? `${row.name}: attend ${row.dangerRequired} classes for 75%${row.dangerRequired > row.remaining ? ' (not achievable)' : `; ${row.misses75} safe misses`}`
+      : `${row.name}: ${row.misses75} classes can be missed while maintaining 75%`).join('; ')
+    return { tone: 'orange', text: `Recovery outlook: ${plans}.` }
+  }
+
   if (subject && /90|target/.test(normalizedQuery) && !/75|danger|maintain/.test(normalizedQuery)) {
     if (!subject.conducted) return { tone: 'yellow', text: `I need conducted and attended counts for ${subject.name} before calculating its 90% target.` }
     if (subject.targetRequired > subject.remaining) return { tone: 'yellow', text: `${subject.name} needs ${subject.targetRequired} classes to finish at 90%, but only ${subject.remaining} remain. The 90% target is not achievable.` }
     return { tone: 'green', text: `${subject.name} needs ${subject.targetRequired} of the ${subject.remaining} remaining classes to finish at or above 90%. You can miss ${Math.max(0, subject.remaining - subject.targetRequired)} and still meet that target.` }
   }
 
-  if (subject && /75|danger|attend|classes|reach|maintain|miss/.test(normalizedQuery)) {
+  if (subject && /75|danger|attend|classes|reach|maintain|miss|recovery|goal/.test(normalizedQuery)) {
     if (!subject.conducted) return { tone: 'yellow', text: `I need conducted and attended counts for ${subject.name} before calculating the exact 75% path.` }
     if (subject.maximum < 75) return { tone: 'red', text: `🔴 ${subject.name} is irreversible. Its maximum possible final attendance is ${formatPercent(subject.maximum)}, below 75%. It needs ${subject.dangerRequired} classes, but only ${subject.remaining} are available.` }
     if (subject.current < 75) return { tone: 'orange', text: `🟠 ${subject.name} is recoverable. Attend the next ${subject.dangerRequired} scheduled classes to finish at or above 75%. You can miss ${subject.misses75} of the ${subject.remaining} remaining.` }

@@ -27,6 +27,35 @@ export function calculateMaximumMisses(attended, conducted, remaining, threshold
   return Math.max(0, remaining - required)
 }
 
+export function calculateGoalPlan(row, goal) {
+  const required = calculateRequiredAttendance(goal, row.attended, row.conducted, row.remaining)
+  return {
+    goal,
+    required,
+    achievable: row.conducted > 0 && required <= row.remaining,
+    canMiss: row.conducted > 0 ? Math.max(0, row.remaining - required) : 0,
+    maximum: row.maximum,
+  }
+}
+
+export function calculateUpcomingClasses(section, subjectCode, fromDate, semesterEnd, holidays = new Set(), cancellations = new Set(), limit = 5) {
+  const [year, month, day] = fromDate.split('-').map(Number)
+  const [endYear, endMonth, endDay] = semesterEnd.split('-').map(Number)
+  const cursor = new Date(year, month - 1, day)
+  const end = new Date(endYear, endMonth - 1, endDay)
+  const dayNames = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri' }
+  const results = []
+  for (; cursor <= end && results.length < limit; cursor.setDate(cursor.getDate() + 1)) {
+    const weekday = dayNames[cursor.getDay()]
+    if (!weekday) continue
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
+    if (holidays.has(key)) continue
+    const count = (section.slots[weekday]?.split(',') || []).filter((slot) => slot === subjectCode || slot.split('/').includes(subjectCode)).length
+    if (count && !cancellations.has(`${key}:${subjectCode}`)) results.push({ date: key, weekday })
+  }
+  return results
+}
+
 export function calculateOverallAttendance(rows) {
   const conducted = rows.reduce((sum, row) => sum + row.conducted, 0)
   const attended = rows.reduce((sum, row) => sum + row.attended, 0)
