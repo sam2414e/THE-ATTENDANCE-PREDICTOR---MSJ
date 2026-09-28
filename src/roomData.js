@@ -64,7 +64,16 @@ const facilitiesByType = {
   'Common Area': ['Wi-Fi', 'Seating'],
 }
 
-const layoutForFloor = (floor) => floor.id === 'ground' ? blueprintLayout : generatedFloorLayouts[floor.id]
+const sharedFloorBlueprint = generatedFloorLayouts.first
+const sharedLayoutForFloor = (floorId) => sharedFloorBlueprint.map(([roomNumber, type, x, y, width, height]) => [
+  /^\d+$/.test(roomNumber) ? `${floorId === 'first' ? 100 : floorId === 'second' ? 200 : 300}${Number(roomNumber) - 100}` : roomNumber,
+  type,
+  x,
+  y,
+  width,
+  height,
+])
+const layoutForFloor = (floor) => floor.id === 'ground' ? blueprintLayout : sharedLayoutForFloor(floor.id)
 
 const timetableTemplates = [
   [{ start: '08:30', end: '09:30', subject: 'Digital Systems' }, { start: '13:30', end: '14:30', subject: 'Computer Networks' }, { start: '17:00', end: '18:00', subject: 'Project Studio' }],
