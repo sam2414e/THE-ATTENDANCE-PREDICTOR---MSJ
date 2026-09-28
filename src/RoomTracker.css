@@ -89,3 +89,23 @@
 @media (max-width: 760px) { .room-layout { display: flex; flex-direction: column; }.room-sidebar, .floor-area, .room-details { width: 100%; }.room-sidebar { grid-template-columns: 1fr 1fr; gap: 15px; }.room-legend { grid-column: 1 / -1; }.floor-grid-wrap { min-height: 340px; padding: 12px; }.floor-grid { min-width: 430px; height: 320px; }.room-finder { align-items: stretch; flex-wrap: wrap; }.room-finder input { flex-basis: calc(100% - 35px); }.room-finder button { width: 100%; }.finder-card { align-items: flex-start; flex-direction: column; }.finder-card button { margin-top: 5px; } }
 
 @media (max-width: 760px) { .floor-grid-wrap { overflow: hidden; }.floor-grid { min-width: 100%; height: 340px; } }
+
+/* Blueprint reference styling: light concrete plan with raised charcoal room blocks. */
+.floor-grid-wrap { padding: 18px; background: #d7d8d4; }
+.floor-grid { border: 1px solid #b8bab7; background-color: #dfe0dc; background-image: linear-gradient(rgba(93,99,99,.16) 1px, transparent 1px), linear-gradient(90deg, rgba(93,99,99,.16) 1px, transparent 1px), linear-gradient(rgba(93,99,99,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(93,99,99,.07) 1px, transparent 1px); background-size: 40px 40px, 40px 40px, 10px 10px, 10px 10px; box-shadow: inset 0 0 45px rgba(69,74,73,.13), 0 13px 24px rgba(67,72,73,.22); }
+.floor-grid::before { inset: 12px; border-color: rgba(76,82,82,.35); }
+.map-room { border: 5px solid #3e4348; border-radius: 2px; color: #fff; background: linear-gradient(145deg, #666c70, #252a2e); box-shadow: 8px 9px 0 rgba(67,72,73,.32), inset 0 0 0 1px rgba(255,255,255,.13); }
+.map-room::after { inset: 6px; border-color: rgba(255,255,255,.15); }
+.map-room strong { color: #fff; text-shadow: 0 2px 4px #111; }
+.map-room small { color: #d9e0e1; }
+.map-room span { color: #f1f3ef; }
+.map-room.free, .map-room.occupied, .map-room.ending, .map-room.claimed { border-color: #3e4348; }
+.map-room.free { box-shadow: 8px 9px 0 rgba(67,72,73,.32), inset 0 5px 0 #2fb978, inset 0 0 0 1px rgba(255,255,255,.13); }
+.map-room.occupied { box-shadow: 8px 9px 0 rgba(67,72,73,.32), inset 0 5px 0 #e2535b, inset 0 0 0 1px rgba(255,255,255,.13); }
+.map-room.ending { box-shadow: 8px 9px 0 rgba(67,72,73,.32), inset 0 5px 0 #e7b33e, inset 0 0 0 1px rgba(255,255,255,.13); }
+.map-room.claimed { box-shadow: 8px 9px 0 rgba(67,72,73,.32), inset 0 5px 0 #548de6, inset 0 0 0 1px rgba(255,255,255,.13); }
+.map-room.free span { color: #7ee2ae; }.map-room.occupied span { color: #ff9da3; }.map-room.ending span { color: #ffe09a; }.map-room.claimed span { color: #a9caff; }
+.map-room:hover, .map-room.selected { background: linear-gradient(145deg, #747b7e, #30363a); }
+.map-corridor { color: #626a6b; border-color: rgba(87,95,95,.35); background: rgba(255,255,255,.22); }
+.map-stairs { color: #687070; border-color: #989d99; background: rgba(255,255,255,.35); }
+@media (max-width: 760px) { .floor-grid-wrap { padding: 10px; }.floor-grid { min-width: 100%; height: 340px; } }
