@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import './App.css'
 import AttendanceAdvisor from './AttendanceAdvisor'
+import { answerQuestion } from './advisorHandler'
 import {
   calculateCurrentAttendance,
   calculateMaximumMisses,
@@ -43,6 +44,8 @@ function App() {
   const [cancellationsInput, setCancellationsInput] = useState('')
   const [showSettings, setShowSettings] = useState(false)
   const [advisorQuery, setAdvisorQuery] = useState('Can I still reach 75% in Behavioural Psychology?')
+  const [mainAdvisorResponse, setMainAdvisorResponse] = useState(null)
+  const [mainAdvisorLoading, setMainAdvisorLoading] = useState(false)
   const [records, setRecords] = useState(() => Object.fromEntries(Object.keys(sections['IV-ECE-A'].subjects).map((code) => [code, { conducted: '', attended: '' }])))
   const section = sections[sectionCode]
   const holidays = useMemo(() => new Set(holidaysInput.split(',').map((item) => item.trim()).filter(Boolean)), [holidaysInput])
@@ -67,6 +70,7 @@ function App() {
   const recoveryRows = rows.filter((row) => row.status.key === 'recovery')
   const updateRecord = (code, key, value) => setRecords((current) => ({ ...current, [code]: { ...(current[code] || {}), [key]: value } }))
   const changeSection = (value) => { setSectionCode(value); setRecords(Object.fromEntries(Object.keys(sections[value].subjects).map((code) => [code, { conducted: '', attended: '' }]))) }
+  const advisorContext = { rows, section, sectionCode, today, planningDate, holidays, cancellations, leavePolicy: null }
   const advisorSubject = rows.find((row) => advisorQuery.toLowerCase().includes(row.name.toLowerCase())) || rows[0]
   const advisorAnswer = advisorSubject.conducted
     ? advisorSubject.status.key === 'irreversible'
@@ -75,6 +79,16 @@ function App() {
         ? `${advisorSubject.name} is recoverable. Attend the next ${advisorSubject.dangerRequired} scheduled classes to finish at or above 75%. You can miss ${advisorSubject.misses75} of the remaining ${advisorSubject.remaining}.`
         : `${advisorSubject.name} is currently at ${advisorSubject.current.toFixed(1)}%. You need ${advisorSubject.targetRequired} classes for the 90% target and can miss ${advisorSubject.misses90} while maintaining it.`
     : `Enter conducted and attended counts for ${advisorSubject.name} and I will calculate the exact path from your section timetable.`
+  const submitMainAdvisor = (event) => {
+    event.preventDefault()
+    const question = advisorQuery.trim()
+    if (!question || mainAdvisorLoading) return
+    setMainAdvisorLoading(true)
+    window.setTimeout(() => {
+      setMainAdvisorResponse(answerQuestion(question, { ...advisorContext, today: new Date(`${today}T12:00:00`) }))
+      setMainAdvisorLoading(false)
+    }, 450)
+  }
 
   return (
     <main className="app-shell">
@@ -83,7 +97,7 @@ function App() {
       <section className="controls panel"><label><span>Class section</span><select value={sectionCode} onChange={(event) => changeSection(event.target.value)}>{Object.entries(sections).map(([code, item]) => <option key={code} value={code}>{item.label}</option>)}</select></label><label><span>Preferred planning date</span><input type="date" value={planningDate} min={SEMESTER_START} max={SEMESTER_END} onChange={(event) => setPlanningDate(event.target.value)} /><small>Counting classes from {formatDate(planningDate)} · semester ends {formatDate(SEMESTER_END)}</small></label><button className="settings-button" type="button" onClick={() => setShowSettings(!showSettings)}>{showSettings ? 'Close schedule settings' : 'Adjust holidays & cancellations'} <span>↗</span></button></section>
       {showSettings && <section className="schedule-settings panel"><div><p className="eyebrow">Schedule exceptions</p><h3>Make the plan match reality</h3><p>Use ISO dates separated by commas. Cancellations use <code>YYYY-MM-DD:SUBJECT_CODE</code>.</p></div><label><span>Holidays</span><input value={holidaysInput} onChange={(event) => setHolidaysInput(event.target.value)} placeholder="2026-10-02, 2026-10-20" /></label><label><span>Cancelled classes</span><input value={cancellationsInput} onChange={(event) => setCancellationsInput(event.target.value)} placeholder="2026-10-05:A, 2026-10-12:LAB" /></label></section>}
 
-      <section className="advisor panel"><div className="advisor-heading"><div><p className="eyebrow coral">Attendance Advisor</p><h3>Ask about your semester in plain language.</h3></div><span className="advisor-pipeline">Natural language → Exact result → Explanation</span></div><div className="advisor-form"><input aria-label="Ask Attendance Advisor" value={advisorQuery} onChange={(event) => setAdvisorQuery(event.target.value)} placeholder="Can I still reach 75% in Physics?" /><span className="advisor-chip">{advisorSubject.code}</span></div><p className="advisor-answer"><strong>{advisorSubject.name}</strong> · {advisorAnswer}</p></section>
+      <section className="advisor panel"><div className="advisor-heading"><div><p className="eyebrow coral">Attendance Advisor</p><h3>Ask about your semester in plain language.</h3></div><span className="advisor-pipeline">Natural language → Exact result → Explanation</span></div><form className="advisor-form" onSubmit={submitMainAdvisor}><input aria-label="Ask Attendance Advisor" value={advisorQuery} onChange={(event) => { setAdvisorQuery(event.target.value); setMainAdvisorResponse(null) }} placeholder="Can I still reach 75% in Physics?" /><span className="advisor-chip">{advisorSubject.code}</span><button className="advisor-submit" type="submit" aria-label="Ask Attendance Advisor">A</button></form>{mainAdvisorLoading ? <p className="advisor-answer advisor-loading"><span /> Attendance Advisor is checking your timetable...</p> : mainAdvisorResponse ? <p className={`advisor-answer advisor-response ${mainAdvisorResponse.tone}`}><strong>{advisorSubject.name}</strong> · {mainAdvisorResponse.text}</p> : <p className="advisor-answer"><strong>{advisorSubject.name}</strong> · {advisorAnswer}</p>}</section>
 
       <section className="summary-cards"><article><span className="summary-label">Current overall attendance</span><strong>{overall.percentage === null ? '—' : `${overall.percentage.toFixed(1)}%`}</strong><small>{overall.conducted ? `${overall.attended} attended of ${overall.conducted} conducted` : 'Enter counts below to calculate'}</small></article><article><span className="summary-label">Total classes remaining</span><strong>{totalRemaining}</strong><small>Across {rows.length} subjects in {section.label}</small></article><article><span className="summary-label">Subjects below 75%</span><strong>{belowDangerCount || '—'}</strong><small>Current attendance, not final projection</small></article><article className={dangerCount ? 'risk-card' : ''}><span className="summary-label">Subjects at irreversible risk</span><strong>{dangerCount || '—'}</strong><small>{dangerCount ? 'Perfect attendance cannot recover them' : 'No entered subject is mathematically trapped'}</small></article></section>
 
@@ -94,7 +108,7 @@ function App() {
       {dangerCount > 0 && <section className="detention-alert"><div className="alert-icon">!</div><div><p className="eyebrow">Irreversible detention</p><h3>{dangerCount} subject{dangerCount === 1 ? '' : 's'} cannot reach 75%</h3><p>Even with perfect attendance in every remaining scheduled class, the maximum possible final attendance is below the mandatory threshold. This warning is based on the final projection, not current attendance alone.</p><div className="alert-subjects">{rows.filter((row) => row.status.key === 'irreversible').map((row) => <span key={row.code}><strong>{row.name}</strong> · {row.current.toFixed(1)}% now → {row.maximum.toFixed(1)}% max · {row.dangerRequired} required / {row.remaining} available</span>)}</div></div></section>}
       {recoveryRows.length > 0 && <section className="planner-grid"><article className="recovery-card"><p className="eyebrow">Recovery planner</p><h3>Bring a recoverable subject back above 75%.</h3>{recoveryRows.slice(0, 3).map((row) => <div className="planner-item" key={row.code}><strong>{row.name}</strong><span>Current {row.current.toFixed(1)}% · attend next {row.dangerRequired} classes · {row.misses75} safe miss{row.misses75 === 1 ? '' : 'es'}</span></div>)}</article><article className="target-planner"><p className="eyebrow">90% target planner</p><h3>Keep the target ambitious and exact.</h3>{rows.filter((row) => row.conducted).slice(0, 3).map((row) => <div className="planner-item" key={row.code}><strong>{row.name}</strong><span>{row.targetRequired > row.remaining ? `Not achievable: ${row.targetRequired} required / ${row.remaining} available` : `${row.targetRequired} required · ${row.misses90} classes can be missed`}</span></div>)}</article></section>}
       <footer><span>Semester window · {formatDate(SEMESTER_START)} — {formatDate(SEMESTER_END)}</span><span><i className="dot green" /> Timetable-aware calculations</span></footer>
-      <AttendanceAdvisor context={{ rows, section, sectionCode, today, planningDate, holidays, cancellations, leavePolicy: null }} />
+      <AttendanceAdvisor context={advisorContext} />
     </main>
   )
 }
